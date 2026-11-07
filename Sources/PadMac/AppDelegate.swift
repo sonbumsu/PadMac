@@ -59,8 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(withTitle: "왼쪽 스틱: 마우스 · 오른쪽 스틱: 스크롤", action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "L1/R1: 우/좌 클릭 · L2/R2: Space 이동", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "L3/R3: 뒤로/앞으로 · ✕/○: 복사/붙여넣기", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "□/△: 실행 취소/다시 실행 · 방향키: 화살표", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "L3/R3: 축소/확대 · 방향키: 화살표", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "✕/○: Return/Esc · □/△: 탭 닫기/새 탭", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Create: Spotlight · PS: Mission Control · 터치패드: 앱 전환", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "L2 누른 채 ✕/○/□/△: 복사/붙여넣기/실행 취소/다시 실행", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "L2 누른 채 ←/→: 뒤로/앞으로", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "PadMac 종료", action: #selector(NSApplication.terminate(_:)),

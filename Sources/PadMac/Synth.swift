@@ -47,7 +47,45 @@ enum Synth {
     // MARK: - ⌘ 단축키
 
     enum Key: CGKeyCode {
-        case c = 8, v = 9, z = 6, leftBracket = 33, rightBracket = 30
+        case c = 8, v = 9, z = 6, w = 13, t = 17
+        case minus = 27, equal = 24, leftBracket = 33, rightBracket = 30
+        case returnKey = 36, escape = 53, tab = 48, space = 49
+    }
+
+    /// 수식키 없이 키 하나를 누르고 뗀다. (Return, Esc 등)
+    static func tap(_ key: Key) {
+        let down = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: true)
+        down?.flags = []
+        let up = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: false)
+        up?.flags = []
+        post(down)
+        post(up)
+    }
+
+    // MARK: - 앱 전환 (⌘Tab)
+
+    /// ⌘ 키만 누르거나 뗀다. 앱 전환기를 열어 두는 동안 ⌘를 잡고 있기 위해 쓴다.
+    static func holdCommand(_ down: Bool) {
+        let e = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: down)
+        e?.flags = down ? .maskCommand : []
+        post(e)
+    }
+
+    /// ⌘가 눌린 상태에서 Tab 한 번
+    static func commandTabStep() {
+        let down = CGEvent(keyboardEventSource: source, virtualKey: Key.tab.rawValue, keyDown: true)
+        down?.flags = .maskCommand
+        let up = CGEvent(keyboardEventSource: source, virtualKey: Key.tab.rawValue, keyDown: false)
+        up?.flags = .maskCommand
+        post(down)
+        post(up)
+    }
+
+    // MARK: - Mission Control
+
+    static func missionControl() {
+        let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
 
     /// ⌘(+⇧) + key 를 누르고 뗀다. (예: ⌘C 복사, ⌘⇧Z 다시 실행)

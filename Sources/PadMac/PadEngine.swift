@@ -2,18 +2,26 @@ import AppKit
 import GameController
 import QuartzCore
 
-/// DualSense 입력을 120Hz로 읽어 마우스/스크롤/Space 전환으로 바꾼다.
+/// DualSense 입력을 120Hz로 읽어 마우스/스크롤/키 입력으로 바꾼다.
 ///
-/// 매핑
+/// 기본 매핑
 ///   왼쪽 스틱   → 마우스 이동
 ///   오른쪽 스틱 → 스크롤
 ///   L1 / R1     → 우클릭 / 좌클릭 (누르고 있으면 드래그)
-///   L2 / R2     → 왼쪽 / 오른쪽 Space로 이동
-///   L3 / R3     → 뒤로 / 앞으로 (⌘[ / ⌘])
+///   L2 / R2     → 왼쪽 / 오른쪽 Space로 이동 (L2는 짧게 눌렀다 뗄 때)
+///   L3 / R3     → 축소 / 확대 (⌘- / ⌘+)
+///   ✕ / ○       → Return / Esc
+///   □ / △       → 탭 닫기 / 새 탭 (⌘W / ⌘T)
+///   방향키      → 화살표 키 (누르고 있으면 반복)
+///   Create      → Spotlight (⌘Space)
+///   PS          → Mission Control
+///   터치패드 클릭 → 앱 전환 (⌘Tab, 연타하면 다음 앱으로)
+///   Options(≡)  → 기능 켜기/끄기
+///
+/// L2를 누른 채로 (편집 레이어)
 ///   ✕ / ○       → 복사 / 붙여넣기 (⌘C / ⌘V)
 ///   □ / △       → 실행 취소 / 다시 실행 (⌘Z / ⌘⇧Z)
-///   방향키      → 화살표 키 (누르고 있으면 반복)
-///   Options(≡)  → 기능 켜기/끄기
+///   ← / →       → 뒤로 / 앞으로 (⌘[ / ⌘])
 final class PadEngine {
     // MARK: 튜닝 값
     var cursorMinSpeed: Double = 60      // px/s, 스틱을 살짝 기울였을 때
@@ -21,6 +29,8 @@ final class PadEngine {
     var scrollMaxSpeed: Double = 2400    // px/s
     let moveDeadzone: Double = 0.12
     let scrollDeadzone: Double = 0.15
+    let l2TapMaxDuration: CFTimeInterval = 0.6   // 이보다 짧게 누르고 떼면 Space 이동
+    let appSwitcherTimeout: CFTimeInterval = 0.8 // 터치패드를 마지막으로 누른 뒤 이 시간이 지나면 앱 전환 확정
 
     var invertScroll = false
 
@@ -43,11 +53,18 @@ final class PadEngine {
 
     private var leftDown = false
     private var rightDown = false
-    private var l2Held = false
-    private var r2Held = false
     private var menuWasPressed = false
     private var pressedButtons: [String: Bool] = [:]
     private var arrowNextRepeat: [Synth.Arrow: CFTimeInterval] = [:] // 눌려 있는 화살표 → 다음 반복 시각
+
+    // L2: 짧게 = Space 이동, 누른 채 = 편집 레이어
+    private var l2Held = false
+    private var l2PressedAt: CFTimeInterval = 0
+    private var l2UsedAsModifier = false
+    private var r2Held = false
+
+    // 터치패드 앱 전환: ⌘를 잡고 있는 동안 연타하면 다음 앱으로
+    private var appSwitcherDeadline: CFTimeInterval?
 
     private struct Click { var button: CGMouseButton; var time: CFTimeInterval; var pos: CGPoint; var count: Int }
     private var lastClick: Click?
@@ -101,7 +118,7 @@ final class PadEngine {
         guard enabled else { return }
 
         handleMove(pad, dt: dt)
-        handleButtons(pad)
+        handleButtons(pad, now: now)
         handleScroll(pad, dt: dt)
     }
 
@@ -136,9 +153,9 @@ final class PadEngine {
         Synth.move(to: new, delta: CGPoint(x: dx, y: dy), type: type, button: button)
     }
 
-    // MARK: - L1/R1 클릭, L2/R2 Space 전환
+    // MARK: - 버튼
 
-    private func handleButtons(_ pad: GCExtendedGamepad) {
+    private func handleButtons(_ pad: GCExtendedGamepad, now: CFTimeInterval) {
         // R1 = 좌클릭, L1 = 우클릭
         let r1 = pad.rightShoulder.isPressed
         if r1 != leftDown { leftDown = r1; click(.left, down: r1) }
@@ -146,31 +163,93 @@ final class PadEngine {
         let l1 = pad.leftShoulder.isPressed
         if l1 != rightDown { rightDown = l1; click(.right, down: l1) }
 
-        // 트리거는 아날로그라 히스테리시스로 한 번 누를 때 한 번만 실행
+        // 트리거는 아날로그라 히스테리시스로 판정
+        // L2: 누른 채 다른 버튼을 쓰면 편집 레이어, 짧게 누르고 떼기만 하면 왼쪽 Space
         let l2 = pad.leftTrigger.value
-        if !l2Held && l2 > 0.6 { l2Held = true; Synth.switchSpace(left: true) }
-        else if l2Held && l2 < 0.3 { l2Held = false }
+        if !l2Held && l2 > 0.6 {
+            l2Held = true
+            l2PressedAt = now
+            l2UsedAsModifier = false
+        } else if l2Held && l2 < 0.3 {
+            l2Held = false
+            if !l2UsedAsModifier && now - l2PressedAt < l2TapMaxDuration {
+                Synth.switchSpace(left: true)
+            }
+        }
 
         let r2 = pad.rightTrigger.value
         if !r2Held && r2 > 0.6 { r2Held = true; Synth.switchSpace(left: false) }
         else if r2Held && r2 < 0.3 { r2Held = false }
 
-        // L3/R3 = 뒤로/앞으로 (⌘[ / ⌘]), ✕/○ = 복사/붙여넣기 (⌘C / ⌘V)
-        onPress("L3", pad.leftThumbstickButton?.isPressed) { Synth.command(.leftBracket) }
-        onPress("R3", pad.rightThumbstickButton?.isPressed) { Synth.command(.rightBracket) }
-        onPress("cross", pad.buttonA.isPressed) { Synth.command(.c) }
-        onPress("circle", pad.buttonB.isPressed) { Synth.command(.v) }
-        // □ = 실행 취소 (⌘Z)
-        onPress("square", pad.buttonX.isPressed) { Synth.command(.z) }
-        // △ = 다시 실행 (⌘⇧Z)
-        onPress("triangle", pad.buttonY.isPressed) { Synth.command(.z, shift: true) }
+        // L3/R3 = 축소/확대
+        onPress("L3", pad.leftThumbstickButton?.isPressed) { Synth.command(.minus) }
+        onPress("R3", pad.rightThumbstickButton?.isPressed) { Synth.command(.equal) }
 
-        // 방향키 = 맥 화살표 키 (누르고 있으면 키보드처럼 반복)
-        let now = CACurrentMediaTime()
+        // 도형 버튼: L2를 누르고 있으면 편집 레이어
+        onPress("cross", pad.buttonA.isPressed) {
+            layered(base: { Synth.tap(.returnKey) }, edit: { Synth.command(.c) })
+        }
+        onPress("circle", pad.buttonB.isPressed) {
+            layered(base: { Synth.tap(.escape) }, edit: { Synth.command(.v) })
+        }
+        onPress("square", pad.buttonX.isPressed) {
+            layered(base: { Synth.command(.w) }, edit: { Synth.command(.z) })
+        }
+        onPress("triangle", pad.buttonY.isPressed) {
+            layered(base: { Synth.command(.t) }, edit: { Synth.command(.z, shift: true) })
+        }
+
+        // 시스템 버튼
+        onPress("create", pad.buttonOptions?.isPressed) { Synth.command(.space) }
+        onPress("ps", pad.buttonHome?.isPressed) { Synth.missionControl() }
+        let touchpad = (pad as? GCDualSenseGamepad)?.touchpadButton.isPressed
+        onPress("touchpad", touchpad) { stepAppSwitcher(now: now) }
+        if let deadline = appSwitcherDeadline, now >= deadline {
+            Synth.holdCommand(false) // ⌘를 떼면 선택한 앱으로 전환
+            appSwitcherDeadline = nil
+        }
+
+        // 방향키: 화살표 키. L2를 누르고 있으면 ←/→ = 뒤로/앞으로
         handleArrow(.up, pad.dpad.up.isPressed, now)
         handleArrow(.down, pad.dpad.down.isPressed, now)
-        handleArrow(.left, pad.dpad.left.isPressed, now)
-        handleArrow(.right, pad.dpad.right.isPressed, now)
+        let dLeft = pad.dpad.left.isPressed
+        let dRight = pad.dpad.right.isPressed
+        if l2Held {
+            handleArrow(.left, false, now)
+            handleArrow(.right, false, now)
+            onPress("dpadLeft", dLeft) { l2UsedAsModifier = true; Synth.command(.leftBracket) }
+            onPress("dpadRight", dRight) { l2UsedAsModifier = true; Synth.command(.rightBracket) }
+        } else {
+            pressedButtons["dpadLeft"] = dLeft
+            pressedButtons["dpadRight"] = dRight
+            handleArrow(.left, dLeft, now)
+            handleArrow(.right, dRight, now)
+        }
+    }
+
+    /// L2를 누르고 있으면 edit, 아니면 base 를 실행한다.
+    private func layered(base: () -> Void, edit: () -> Void) {
+        if l2Held {
+            l2UsedAsModifier = true
+            edit()
+        } else {
+            base()
+        }
+    }
+
+    /// 처음 누르면 ⌘를 잡고 Tab, 시간 안에 다시 누르면 Tab 한 번 더.
+    /// 마지막으로 누르고 appSwitcherTimeout 이 지나면 ⌘를 떼서 전환을 확정한다.
+    private func stepAppSwitcher(now: CFTimeInterval) {
+        if appSwitcherDeadline == nil { Synth.holdCommand(true) }
+        Synth.commandTabStep()
+        appSwitcherDeadline = now + appSwitcherTimeout
+    }
+
+    /// 버튼이 눌리는 순간에만 한 번 실행한다.
+    private func onPress(_ id: String, _ pressed: Bool?, _ action: () -> Void) {
+        let now = pressed ?? false
+        if now && !(pressedButtons[id] ?? false) { action() }
+        pressedButtons[id] = now
     }
 
     /// 누름 → keyDown, 계속 누름 → 시스템 키 반복 설정대로 반복, 뗌 → keyUp
@@ -189,13 +268,6 @@ final class PadEngine {
             Synth.arrow(arrow, down: false)
             arrowNextRepeat[arrow] = nil
         }
-    }
-
-    /// 버튼이 눌리는 순간에만 한 번 실행한다.
-    private func onPress(_ id: String, _ pressed: Bool?, _ action: () -> Void) {
-        let now = pressed ?? false
-        if now && !(pressedButtons[id] ?? false) { action() }
-        pressedButtons[id] = now
     }
 
     private func click(_ button: CGMouseButton, down: Bool) {
@@ -252,6 +324,10 @@ final class PadEngine {
         pressedButtons.removeAll()
         for arrow in arrowNextRepeat.keys { Synth.arrow(arrow, down: false) }
         arrowNextRepeat.removeAll()
+        if appSwitcherDeadline != nil {
+            Synth.holdCommand(false)
+            appSwitcherDeadline = nil
+        }
         moveRemainder = .zero
         scrollRemainder = .zero
     }
