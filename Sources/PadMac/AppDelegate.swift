@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -25,11 +25,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ = AXIsProcessTrustedWithOptions(opts)
     }
 
+    /// 메뉴바 아이콘: 로고 실루엣 (꺼져 있거나 패드가 없으면 흐리게)
+    private lazy var menuBarImage: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png"),
+              let img = NSImage(contentsOf: url) else {
+            return NSImage(systemSymbolName: "gamecontroller.fill", accessibilityDescription: "PadMac")
+        }
+        let height: CGFloat = 16
+        img.size = NSSize(width: (img.size.width / img.size.height * height).rounded(), height: height)
+        img.isTemplate = true // 다크/라이트 모드에 맞게 자동으로 색이 바뀜
+        return img
+    }()
+
     private func updateIcon() {
-        let name = engine.enabled ? "gamecontroller.fill" : "gamecontroller"
-        let img = NSImage(systemSymbolName: name, accessibilityDescription: "PadMac")
-        img?.isTemplate = true
-        statusItem.button?.image = img
+        statusItem.button?.image = menuBarImage
         statusItem.button?.appearsDisabled = !engine.enabled || engine.controller == nil
     }
 

@@ -1,6 +1,10 @@
-# PadMac
+<p align="center">
+  <img src="assets/logo.png" width="160" alt="PadMac 로고">
+</p>
 
-DualSense(PS5) 패드로 macOS를 조작하는 메뉴바 앱.
+<h1 align="center">PadMac</h1>
+
+<p align="center">DualSense(PS5) 패드로 macOS를 조작하는 메뉴바 앱</p>
 
 ## 버튼 설정
 
@@ -68,3 +72,14 @@ pkill -x PadMac; open ~/Applications/PadMac.app
 - `Sources/PadMac/Synth.swift` — CGEvent로 마우스/스크롤/키 이벤트 생성
 - `Sources/PadMac/AppDelegate.swift` — 메뉴바 아이콘과 메뉴
 - `build.sh` — `swiftc`로 컴파일하고 `.app` 번들 생성 및 ad-hoc 서명
+
+## 아이콘 다시 만들기
+
+`assets/logo-source.png` 를 바꾼 뒤 프로젝트 루트에서:
+
+```sh
+swiftc -O tools/make_icons.swift -o /tmp/make_icons && /tmp/make_icons
+./build.sh
+```
+
+`assets/logo.png`(README 로고), `assets/AppIcon.icns`(앱 아이콘), `assets/MenuBarIcon.png`(메뉴바 아이콘)가 새로 만들어집니다.

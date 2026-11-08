@@ -14,8 +14,10 @@ swiftc -O -swift-version 5 -target arm64-apple-macosx13.0 \
 
 pkill -x PadMac 2>/dev/null || true
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD_DIR/PadMac" "$APP/Contents/MacOS/PadMac"
+# 아이콘 (assets/ 는 tools/make_icons.swift 로 만든다)
+cp assets/AppIcon.icns assets/MenuBarIcon.png "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -25,6 +27,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key><string>com.sonbumsu.padmac</string>
     <key>CFBundleName</key><string>PadMac</string>
     <key>CFBundleExecutable</key><string>PadMac</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1</string>
     <key>CFBundleVersion</key><string>1</string>
