@@ -2,7 +2,18 @@
 
 DualSense(PS5) 패드로 macOS를 조작하는 메뉴바 앱.
 
-## 버튼 매핑
+## 버튼 설정
+
+메뉴바 🎮 아이콘 → **버튼 설정…** 에서 버튼마다 동작을 바꿀 수 있습니다.
+
+- 버튼마다 **기본** 동작과 **L2 누른 채** 동작을 따로 지정
+- 목록에서 고르거나(클릭, Space 이동, Mission Control, 앱 전환, 자주 쓰는 단축키), **단축키 직접 입력…** 으로 원하는 키 조합을 눌러서 녹화
+- 마우스 속도, 스크롤 속도, 스크롤 방향
+- 바꾸면 바로 적용되고 `~/Library/Application Support/PadMac/config.json` 에 저장됨 (백업·공유 가능)
+
+왼쪽 스틱(마우스), 오른쪽 스틱(스크롤), Options(켜기/끄기)는 고정입니다.
+
+## 기본 버튼 매핑
 
 ### 기본
 
@@ -51,7 +62,9 @@ pkill -x PadMac; open ~/Applications/PadMac.app
 
 ## 구조
 
-- `Sources/PadMac/PadEngine.swift` — GameController로 패드 입력을 120Hz로 읽어 동작으로 변환
+- `Sources/PadMac/PadEngine.swift` — GameController로 패드 입력을 120Hz로 읽어 설정에 따라 동작으로 변환
+- `Sources/PadMac/Config.swift` — 버튼·동작·설정 모델과 저장 (config.json)
+- `Sources/PadMac/SettingsView.swift` — 버튼 설정 창 (SwiftUI)
 - `Sources/PadMac/Synth.swift` — CGEvent로 마우스/스크롤/키 이벤트 생성
 - `Sources/PadMac/AppDelegate.swift` — 메뉴바 아이콘과 메뉴
 - `build.sh` — `swiftc`로 컴파일하고 `.app` 번들 생성 및 ad-hoc 서명

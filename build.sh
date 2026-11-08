@@ -9,7 +9,7 @@ APP="$HOME/Applications/PadMac.app"
 
 mkdir -p "$BUILD_DIR"
 swiftc -O -swift-version 5 -target arm64-apple-macosx13.0 \
-    -framework AppKit -framework GameController \
+    -framework AppKit -framework GameController -framework SwiftUI \
     Sources/PadMac/*.swift -o "$BUILD_DIR/PadMac"
 
 pkill -x PadMac 2>/dev/null || true

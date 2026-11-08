@@ -1,9 +1,12 @@
 import AppKit
 import ApplicationServices
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let engine = PadEngine()
+    private let store = ConfigStore()
     private var statusItem: NSStatusItem!
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -11,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
+        engine.apply(store.config)
+        store.onChange = { [weak self] config in self?.engine.apply(config) }
         engine.onChange = { [weak self] in self?.updateIcon() }
         engine.start()
         updateIcon()
@@ -53,17 +58,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let invert = NSMenuItem(title: "스크롤 방향 반전",
                                 action: #selector(toggleInvert), keyEquivalent: "")
         invert.target = self
-        invert.state = engine.invertScroll ? .on : .off
+        invert.state = store.config.invertScroll ? .on : .off
         menu.addItem(invert)
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "왼쪽 스틱: 마우스 · 오른쪽 스틱: 스크롤", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "L1/R1: 우/좌 클릭 · L2/R2: Space 이동", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "L3/R3: 축소/확대 · 방향키: 화살표", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "✕/○: Return/Esc · □/△: 탭 닫기/새 탭", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "Create: Spotlight · PS: Mission Control · 터치패드: 앱 전환", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "L2 누른 채 ✕/○/□/△: 복사/붙여넣기/실행 취소/다시 실행", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "L2 누른 채 ←/→: 뒤로/앞으로", action: nil, keyEquivalent: "")
+
+        let settings = NSMenuItem(title: "버튼 설정…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "PadMac 종료", action: #selector(NSApplication.terminate(_:)),
@@ -72,7 +75,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleEnabled() { engine.enabled.toggle() }
-    @objc private func toggleInvert() { engine.invertScroll.toggle() }
+    @objc private func toggleInvert() { store.config.invertScroll.toggle() }
+
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store)))
+            window.title = "PadMac 버튼 설정"
+            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true) // 메뉴바 앱이라 직접 앞으로 가져와야 키 입력을 받는다
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
 
     @objc private func openAccessibility() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {

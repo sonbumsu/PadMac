@@ -44,41 +44,76 @@ enum Synth {
         post(e)
     }
 
-    // MARK: - ⌘ 단축키
+    // MARK: - 키 조합
 
-    enum Key: CGKeyCode {
-        case c = 8, v = 9, z = 6, w = 13, t = 17
-        case minus = 27, equal = 24, leftBracket = 33, rightBracket = 30
-        case returnKey = 36, escape = 53, tab = 48, space = 49
+    /// 실제 키보드처럼: 수식키 누름 → 키 누름 ... 키 뗌 → 수식키 뗌
+    static func keyDown(_ c: KeyCombo) {
+        var flags: CGEventFlags = []
+        for m in modifiers(c) where m.on {
+            flags.insert(m.flag)
+            postKey(m.code, down: true, flags: flags)
+        }
+        postKey(c.keyCode, down: true, flags: keyFlags(c))
     }
 
-    /// 수식키 없이 키 하나를 누르고 뗀다. (Return, Esc 등)
-    static func tap(_ key: Key) {
-        let down = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: true)
-        down?.flags = []
-        let up = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: false)
-        up?.flags = []
-        post(down)
-        post(up)
+    static func keyRepeat(_ c: KeyCombo) {
+        let e = CGEvent(keyboardEventSource: source, virtualKey: c.keyCode, keyDown: true)
+        e?.flags = keyFlags(c)
+        e?.setIntegerValueField(.keyboardEventAutorepeat, value: 1)
+        post(e)
+    }
+
+    static func keyUp(_ c: KeyCombo) {
+        postKey(c.keyCode, down: false, flags: keyFlags(c))
+        var flags = modifierFlags(c)
+        for m in modifiers(c).reversed() where m.on {
+            flags.remove(m.flag)
+            postKey(m.code, down: false, flags: flags)
+        }
+    }
+
+    private static func postKey(_ code: CGKeyCode, down: Bool, flags: CGEventFlags) {
+        let e = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down)
+        e?.flags = flags
+        post(e)
+    }
+
+    private static func modifiers(_ c: KeyCombo) -> [(on: Bool, code: CGKeyCode, flag: CGEventFlags)] {
+        [(c.control, 59, .maskControl), (c.option, 58, .maskAlternate),
+         (c.shift, 56, .maskShift), (c.command, 55, .maskCommand)]
+    }
+
+    private static func modifierFlags(_ c: KeyCombo) -> CGEventFlags {
+        var f: CGEventFlags = []
+        for m in modifiers(c) where m.on { f.insert(m.flag) }
+        return f
+    }
+
+    /// 실제 키보드의 화살표·F키 등은 Fn(·숫자패드) 플래그가 붙어서 온다.
+    /// 시스템 단축키(⌃← Space 이동 등)가 이 플래그까지 맞아야 동작한다.
+    private static let fnKeys: Set<CGKeyCode> = [
+        115, 116, 117, 119, 121, 122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111,
+        123, 124, 125, 126,
+    ]
+
+    private static func keyFlags(_ c: KeyCombo) -> CGEventFlags {
+        var f = modifierFlags(c)
+        if fnKeys.contains(c.keyCode) { f.insert(.maskSecondaryFn) }
+        if (123...126).contains(c.keyCode) { f.insert(.maskNumericPad) }
+        return f
     }
 
     // MARK: - 앱 전환 (⌘Tab)
 
     /// ⌘ 키만 누르거나 뗀다. 앱 전환기를 열어 두는 동안 ⌘를 잡고 있기 위해 쓴다.
     static func holdCommand(_ down: Bool) {
-        let e = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: down)
-        e?.flags = down ? .maskCommand : []
-        post(e)
+        postKey(55, down: down, flags: down ? .maskCommand : [])
     }
 
     /// ⌘가 눌린 상태에서 Tab 한 번
     static func commandTabStep() {
-        let down = CGEvent(keyboardEventSource: source, virtualKey: Key.tab.rawValue, keyDown: true)
-        down?.flags = .maskCommand
-        let up = CGEvent(keyboardEventSource: source, virtualKey: Key.tab.rawValue, keyDown: false)
-        up?.flags = .maskCommand
-        post(down)
-        post(up)
+        postKey(48, down: true, flags: .maskCommand)
+        postKey(48, down: false, flags: .maskCommand)
     }
 
     // MARK: - Mission Control
@@ -86,74 +121,6 @@ enum Synth {
     static func missionControl() {
         let url = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-    }
-
-    /// ⌘(+⇧) + key 를 누르고 뗀다. (예: ⌘C 복사, ⌘⇧Z 다시 실행)
-    static func command(_ key: Key, shift: Bool = false) {
-        let cmd: CGKeyCode = 55
-        let shiftKey: CGKeyCode = 56
-        let flags: CGEventFlags = shift ? [.maskCommand, .maskShift] : .maskCommand
-
-        var events: [CGEvent?] = []
-        let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: cmd, keyDown: true)
-        cmdDown?.flags = .maskCommand
-        events.append(cmdDown)
-        if shift {
-            let shiftDown = CGEvent(keyboardEventSource: source, virtualKey: shiftKey, keyDown: true)
-            shiftDown?.flags = flags
-            events.append(shiftDown)
-        }
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: true)
-        keyDown?.flags = flags
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: key.rawValue, keyDown: false)
-        keyUp?.flags = flags
-        events += [keyDown, keyUp]
-        if shift {
-            let shiftUp = CGEvent(keyboardEventSource: source, virtualKey: shiftKey, keyDown: false)
-            shiftUp?.flags = .maskCommand
-            events.append(shiftUp)
-        }
-        let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: cmd, keyDown: false)
-        cmdUp?.flags = []
-        events.append(cmdUp)
-
-        events.forEach(post)
-    }
-
-    // MARK: - 화살표 키
-
-    enum Arrow: CGKeyCode {
-        case left = 123, right = 124, down = 125, up = 126
-    }
-
-    /// 실제 키보드 화살표처럼 누름/뗌/자동 반복 이벤트를 보낸다.
-    static func arrow(_ arrow: Arrow, down: Bool, isRepeat: Bool = false) {
-        let e = CGEvent(keyboardEventSource: source, virtualKey: arrow.rawValue, keyDown: down)
-        // 실제 화살표 키 이벤트에는 Fn·숫자패드 플래그가 붙어 있다.
-        e?.flags = [.maskSecondaryFn, .maskNumericPad]
-        if isRepeat { e?.setIntegerValueField(.keyboardEventAutorepeat, value: 1) }
-        post(e)
-    }
-
-    // MARK: - Space 전환 (3손가락 좌/우 스와이프와 같은 동작)
-
-    /// macOS 기본 단축키 "왼쪽/오른쪽 Space로 이동" = ⌃← / ⌃→
-    static func switchSpace(left: Bool) {
-        let ctrl: CGKeyCode = 59
-        let arrow: CGKeyCode = left ? 123 : 124
-        // 시스템 단축키는 화살표 키에 Fn 플래그가 붙은 상태로 등록되어 있다.
-        let flags: CGEventFlags = [.maskControl, .maskSecondaryFn]
-
-        let ctrlDown = CGEvent(keyboardEventSource: source, virtualKey: ctrl, keyDown: true)
-        ctrlDown?.flags = .maskControl
-        let arrowDown = CGEvent(keyboardEventSource: source, virtualKey: arrow, keyDown: true)
-        arrowDown?.flags = flags
-        let arrowUp = CGEvent(keyboardEventSource: source, virtualKey: arrow, keyDown: false)
-        arrowUp?.flags = flags
-        let ctrlUp = CGEvent(keyboardEventSource: source, virtualKey: ctrl, keyDown: false)
-        ctrlUp?.flags = []
-
-        [ctrlDown, arrowDown, arrowUp, ctrlUp].forEach(post)
     }
 
     // MARK: - 화면 경계
