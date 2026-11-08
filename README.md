@@ -6,6 +6,36 @@
 
 <p align="center">DualSense(PS5) 패드로 macOS를 조작하는 메뉴바 앱</p>
 
+<p align="center">
+  <a href="https://github.com/sonbumsu/PadMac/releases/latest"><b>⬇️ 최신 버전 다운로드</b></a>
+</p>
+
+## 설치
+
+**요구 사항:** macOS 13 (Ventura) 이상 · Apple Silicon / Intel 모두 지원
+
+1. [Releases](https://github.com/sonbumsu/PadMac/releases/latest)에서 `PadMac-x.x.x.zip`을 내려받아 압축을 풉니다.
+2. `PadMac.app`을 **응용 프로그램** 폴더로 옮깁니다.
+3. `PadMac.app`을 실행합니다.
+
+### "Apple이 확인할 수 없습니다" 경고가 뜰 때
+
+PadMac은 Apple 개발자 인증서로 서명·공증되지 않은 무료 오픈소스 앱이라, 처음 실행할 때 macOS가 막습니다. 아래 중 한 가지로 열 수 있습니다.
+
+- **방법 1:** 경고 창을 닫고 **시스템 설정 → 개인정보 보호 및 보안**으로 가서, 아래쪽의 *"PadMac이(가) 차단되었습니다"* 옆 **그래도 열기**를 누릅니다.
+- **방법 2:** 터미널에서 아래 명령을 실행한 뒤 다시 엽니다.
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/PadMac.app
+  ```
+
+### 권한 허용
+
+처음 실행하면 **손쉬운 사용** 권한을 요청합니다. **시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용**에서 PadMac을 켜 주세요. 이 권한이 있어야 마우스·키보드 입력을 보낼 수 있습니다.
+
+### 패드 연결
+
+DualSense를 블루투스(**시스템 설정 → Bluetooth**, 패드의 PS + Create 버튼을 길게 눌러 페어링 모드) 또는 USB로 연결하면 메뉴바 아이콘이 진하게 바뀝니다.
+
 ## 버튼 설정
 
 메뉴바 🎮 아이콘 → **버튼 설정…** 에서 버튼마다 동작을 바꿀 수 있습니다.
@@ -46,16 +76,22 @@
 
 > PS 버튼은 macOS가 기본으로 가로채서 Launchpad를 엽니다. **시스템 설정 → 게임 컨트롤러**에서 해당 동작을 꺼 주세요.
 
-## 빌드 & 실행
+## 소스에서 빌드하기
 
-macOS 13 이상, Apple Silicon, Xcode Command Line Tools 필요.
+Xcode Command Line Tools가 필요합니다. 없다면 먼저 설치하세요.
 
 ```sh
-./build.sh                       # ~/Applications/PadMac.app 으로 설치
+xcode-select --install
+```
+
+```sh
+git clone https://github.com/sonbumsu/PadMac.git
+cd PadMac
+./build.sh                       # Universal 앱을 ~/Applications/PadMac.app 으로 설치
 open ~/Applications/PadMac.app
 ```
 
-처음 실행하면 **시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용**에서 PadMac을 허용해야 합니다.
+`./build.sh --zip` 을 쓰면 배포용 zip도 함께 만듭니다.
 
 다시 빌드한 뒤 입력이 안 먹히면 (ad-hoc 서명이 바뀌어 권한이 무효화됨):
 
@@ -71,7 +107,7 @@ pkill -x PadMac; open ~/Applications/PadMac.app
 - `Sources/PadMac/SettingsView.swift` — 버튼 설정 창 (SwiftUI)
 - `Sources/PadMac/Synth.swift` — CGEvent로 마우스/스크롤/키 이벤트 생성
 - `Sources/PadMac/AppDelegate.swift` — 메뉴바 아이콘과 메뉴
-- `build.sh` — `swiftc`로 컴파일하고 `.app` 번들 생성 및 ad-hoc 서명
+- `build.sh` — `swiftc`로 arm64·x86_64 컴파일 후 Universal `.app` 번들 생성 및 ad-hoc 서명
 
 ## 아이콘 다시 만들기
 
@@ -83,3 +119,7 @@ swiftc -O tools/make_icons.swift -o /tmp/make_icons && /tmp/make_icons
 ```
 
 `assets/logo.png`(README 로고), `assets/AppIcon.icns`(앱 아이콘), `assets/MenuBarIcon.png`(메뉴바 아이콘)가 새로 만들어집니다.
+
+## 라이선스
+
+[MIT](LICENSE)
